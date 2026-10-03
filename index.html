@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMG & Discord Store – Blockman Go Accounts, Clans, Items</title>
+<meta name="description" content="Buy Blockman Go accounts, clans, in-game items and Discord servers.">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  body{font-family:'Inter',sans-serif;background:#08090d;color:#f3f4f6}
+  .card{background:#11131c;border:1px solid #1e2333}
+  .card:hover{border-color:#a855f7}
+  .scroll-none::-webkit-scrollbar{display:none}
+  :focus-visible{outline:2px solid #06b6d4;outline-offset:2px}
+</style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+<header class="sticky top-0 z-40 bg-[#08090d]/90 backdrop-blur border-b border-[#1e2333]">
+  <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+    <a href="#" onclick="setCat('All')" class="font-extrabold text-lg tracking-wide">BMG <span class="text-purple-400">&</span> Discord Store</a>
+    <button onclick="toggleCart()" class="relative card rounded-xl px-4 py-2 text-sm font-semibold" aria-label="Open cart">
+      Cart <span id="cart-count" class="ml-1 bg-purple-500 text-xs rounded-full px-2 py-0.5">0</span>
+    </button>
+  </div>
+</header>
+
+<section class="max-w-6xl mx-auto px-4 pt-8 w-full">
+  <h1 class="text-3xl sm:text-5xl font-extrabold leading-tight">Blockman Go accounts, clans and items</h1>
+  <p class="mt-3 text-gray-400 max-w-xl">Pick what you want, add it to your cart, and send your order on Discord. We reply with payment and delivery details.</p>
+</section>
+
+<main class="max-w-6xl mx-auto px-4 py-8 w-full flex-grow">
+  <div class="flex flex-col md:flex-row gap-3 md:items-center justify-between mb-6">
+    <div id="filters" class="flex gap-2 overflow-x-auto scroll-none"></div>
+    <input id="search" oninput="render()" placeholder="Search offers" class="card rounded-xl px-4 py-2 text-sm w-full md:w-72 bg-transparent">
+  </div>
+  <p id="count" class="text-sm text-gray-400 mb-4"></p>
+  <div id="grid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+  <p id="empty" class="hidden text-center text-gray-400 py-16">No offers match. Try another category or search.</p>
+</main>
+
+<footer class="border-t border-[#1e2333] py-6 text-center text-xs text-gray-500">
+  © BMG & Discord Store. Not affiliated with Blockman Go or Discord.
+</footer>
+
+<div id="zoom" onclick="this.classList.add('hidden')" class="hidden fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4"><img id="zoom-img" class="max-h-[85vh] max-w-full rounded-2xl"></div>
+<div id="overlay" onclick="toggleCart()" class="fixed inset-0 bg-black/70 z-50 hidden"></div>
+<aside id="drawer" class="fixed top-0 right-0 h-full w-full max-w-md bg-[#0d0f16] border-l border-[#1e2333] z-50 translate-x-full transition-transform flex flex-col">
+  <div class="p-5 border-b border-[#1e2333] flex justify-between items-center">
+    <h2 class="font-bold">Your cart</h2>
+    <button onclick="toggleCart()" class="text-2xl leading-none" aria-label="Close cart">×</button>
+  </div>
+  <div id="cart-items" class="p-5 flex-grow overflow-y-auto space-y-3"></div>
+  <div class="p-5 border-t border-[#1e2333] space-y-3">
+    <input id="buyer" placeholder="Your Discord username" class="card rounded-xl px-4 py-2 text-sm w-full bg-transparent">
+    <div class="flex justify-between text-sm"><span class="text-gray-400">Total</span><span id="total" class="font-bold text-cyan-400"></span></div>
+    <button onclick="checkout()" class="w-full py-3 rounded-xl font-extrabold text-black bg-gradient-to-r from-purple-500 to-cyan-400">Send order on Discord</button>
+    <p class="text-xs text-gray-500">Your order is copied to your clipboard. Paste it in our Discord server.</p>
+  </div>
+</aside>
+
+<script>
+// ====== EDIT THESE ======
+const DISCORD_INVITE = "https://discord.gg/bedwars-ranking-server-1390796624909041714"; // your server invite
+const CATEGORIES = ["All","Accounts","Clans","Items","Discord"];
+// price = USD, stock = how many you have left (set to 0 for sold out)
+const PRODUCTS = [
+  {id:1,cat:"Accounts",name:"OG Account – Offer 1",desc:"Rare gold-and-teal set with staff and wings.",price:1,coins:0,stock:1,img:"images/og-account-1.jpg"},
+  {id:2,cat:"Accounts",name:"OG Account – Offer 2",desc:"Spiky hair, glasses, football kit and ball.",price:10,coins:0,stock:20,img:"images/og-account-2.jpg"},
+  {id:3,cat:"Clans",name:"Level 4 Clan",desc:"Active clan with level 4 perks unlocked.",price:5,coins:0,stock:1,img:"images/clan-lvl4.jpg"},
+  {id:4,cat:"Clans",name:"Level 6 Clan",desc:"Top-tier clan with level 6 perks.",price:10,coins:0,stock:1,img:"images/clan-lvl6.jpg"},
+  {id:5,cat:"Items",name:"VIP 1",desc:"VIP 1 with space-themed look.",price:5,coins:0,stock:1,img:"images/vip-1.jpg"},
+  {id:6,cat:"Discord",name:"Custom Bot",desc:"Your own ranking bot with your name and logo.",price:5,coins:0,stock:1,img:"images/custom-bot.jpg"},
+  {id:7,cat:"Discord",name:"Community Server",desc:"Ready-made community server with members.",price:1,coins:0,stock:1,img:"images/discord-server.jpg"}
+];
+// ========================
+
+let cat="All", cart=[];
+const $=id=>document.getElementById(id);
+const money=(p,c)=>[p?`$${p.toFixed(2)}`:"",c?`${c.toLocaleString()} coins`:""].filter(Boolean).join(" + ");
+
+function zoom(src){$("zoom-img").src=src;$("zoom").classList.remove("hidden")}
+function setCat(c){cat=c;render()}
+function render(){
+  $("filters").innerHTML=CATEGORIES.map(c=>`<button onclick="setCat('${c}')" class="px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap ${c===cat?'bg-purple-500 text-white':'card text-gray-300'}">${c}</button>`).join("");
+  const q=$("search").value.toLowerCase();
+  const list=PRODUCTS.filter(p=>(cat==="All"||p.cat===cat)&&(p.name+p.desc).toLowerCase().includes(q));
+  $("count").textContent=`${list.length} offer${list.length===1?"":"s"}`;
+  $("empty").classList.toggle("hidden",list.length>0);
+  $("grid").innerHTML=list.map(p=>`
+    <div class="card rounded-2xl p-5 flex flex-col transition">
+      <img src="${p.img}" alt="${p.name}" loading="lazy" onclick="zoom('${p.img}')" class="w-full h-44 object-contain bg-[#0b0c12] rounded-xl mb-3 cursor-zoom-in">
+      <div class="text-xs text-gray-500">${p.cat}</div>
+      <h3 class="font-bold mt-1">${p.name}</h3>
+      <p class="text-sm text-gray-400 mt-1 flex-grow">${p.desc}</p>
+      <p class="text-xs mt-2 ${p.stock<1?'text-red-400':p.stock<=1?'text-amber-400':'text-green-400'}">${p.stock<1?'Sold out':p.stock===1?'Only 1 in stock':p.stock+' in stock'}</p>
+      <div class="flex items-center justify-between mt-4">
+        <span class="font-bold ${p.price?'text-cyan-400':'text-amber-400'}">${money(p.price,p.coins)}</span>
+        <button onclick="add(${p.id})" ${p.stock<1?'disabled':''} class="px-4 py-2 rounded-xl text-sm font-bold ${p.stock<1?'bg-gray-700 text-gray-400 cursor-not-allowed':'bg-purple-500 hover:bg-purple-400'}">${p.stock<1?'Sold out':'Add to cart'}</button>
+      </div>
+    </div>`).join("");
+}
+
+function add(id){
+  const it=cart.find(i=>i.id===id),x=PRODUCTS.find(y=>y.id===id);
+  if(it&&it.qty>=x.stock){alert("Only "+x.stock+" in stock.");toggleCart(true);return}
+  it?it.qty++:cart.push({id,qty:1});
+  drawCart();toggleCart(true);
+}
+function change(id,d){
+  const it=cart.find(i=>i.id===id),x=PRODUCTS.find(y=>y.id===id);
+  if(d>0&&it.qty>=x.stock){alert("Only "+x.stock+" in stock.");return}
+  it.qty+=d;
+  if(it.qty<1)cart=cart.filter(i=>i.id!==id);
+  drawCart();
+}
+function totals(){
+  let p=0,c=0;
+  cart.forEach(i=>{const x=PRODUCTS.find(y=>y.id===i.id);p+=x.price*i.qty;c+=x.coins*i.qty});
+  return {p,c};
+}
+function drawCart(){
+  $("cart-count").textContent=cart.reduce((n,i)=>n+i.qty,0);
+  $("cart-items").innerHTML=cart.length?cart.map(i=>{
+    const x=PRODUCTS.find(y=>y.id===i.id);
+    return `<div class="card rounded-xl p-3 flex items-center justify-between gap-3">
+      <div><div class="font-semibold text-sm">${x.name}</div><div class="text-xs text-gray-400">${money(x.price,x.coins)}</div></div>
+      <div class="flex items-center gap-2">
+        <button onclick="change(${x.id},-1)" class="w-7 h-7 card rounded-lg" aria-label="Remove one">−</button>
+        <span class="text-sm w-4 text-center">${i.qty}</span>
+        <button onclick="change(${x.id},1)" class="w-7 h-7 card rounded-lg" aria-label="Add one">+</button>
+      </div></div>`}).join(""):`<p class="text-gray-400 text-sm">Your cart is empty. Add an offer to get started.</p>`;
+  const t=totals();$("total").textContent=money(t.p,t.c)||"$0.00";
+}
+function toggleCart(open){
+  const d=$("drawer"),o=$("overlay");
+  const show=open===true?true:d.classList.contains("translate-x-full");
+  d.classList.toggle("translate-x-full",!show);
+  o.classList.toggle("hidden",!show);
+}
+async function checkout(){
+  if(!cart.length){alert("Your cart is empty.");return}
+  const who=$("buyer").value.trim();
+  if(!who){alert("Enter your Discord username so we can contact you.");$("buyer").focus();return}
+  const t=totals();
+  const text=`New order from ${who}\n`+cart.map(i=>{const x=PRODUCTS.find(y=>y.id===i.id);return `- ${i.qty} × ${x.name} (${money(x.price,x.coins)})`}).join("\n")+`\nTotal: ${money(t.p,t.c)}`;
+  try{await navigator.clipboard.writeText(text)}catch(e){prompt("Copy your order:",text)}
+  alert("Order copied. Paste it in our Discord server.");
+  window.open(DISCORD_INVITE,"_blank");
+}
+render();drawCart();
+</script>
+</body>
+</html>
